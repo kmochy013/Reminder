@@ -1,0 +1,6 @@
+{
+  "name": "Reminder",
+  "description": "Smart Reminder app with notifications, alerts, and 1-minute repeat reminders until acknowledged",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
