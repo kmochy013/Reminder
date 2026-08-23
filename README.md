@@ -20,13 +20,6 @@ A modern, high-precision Android reminder and task management application built 
 
 ---
 
-## 📱 Screenshots
-
-| Upcoming & Active Alerts | Schedule & Edit Reminder | Rich Notification Alert |
-|:---:|:---:|:---:|
-| *(Add your screenshot here)* | *(Add your screenshot here)* | *(Add your screenshot here)* |
-
----
 
 ## 🛠️ Tech Stack & Architecture
 
