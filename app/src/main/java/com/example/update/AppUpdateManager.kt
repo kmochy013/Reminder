@@ -167,12 +167,17 @@ object AppUpdateManager {
 
     fun sanitizeGitHubRepo(input: String): String {
         var cleaned = input.trim()
-        cleaned = cleaned.removePrefix("https://github.com/")
-            .removePrefix("http://github.com/")
-            .removePrefix("github.com/")
-        cleaned = cleaned.removeSuffix("/releases")
-            .removeSuffix("/releases/")
-            .removeSuffix("/")
+        cleaned = cleaned.removePrefix("https://").removePrefix("http://")
+        cleaned = cleaned.removePrefix("www.github.com/").removePrefix("github.com/")
+        while (cleaned.endsWith("/")) {
+            cleaned = cleaned.dropLast(1)
+        }
+        if (cleaned.endsWith("/releases")) {
+            cleaned = cleaned.removeSuffix("/releases")
+        }
+        while (cleaned.endsWith("/")) {
+            cleaned = cleaned.dropLast(1)
+        }
         return cleaned.trim()
     }
 
@@ -265,76 +270,117 @@ object AppUpdateManager {
                         parsedVersionCode = json.getInt("version_code")
                     }
                 } else {
-                    // Query GitHub API first
-                    val targetUrl = "https://api.github.com/repos/$repo/releases/latest"
-                    val request = Request.Builder()
-                        .url(targetUrl)
-                        .header("User-Agent", "ReminderApp-Android")
-                        .header("Accept", "application/vnd.github.v3+json")
-                        .build()
+                    // 1. Try GitHub API: releases/latest
+                    var success = false
+                    try {
+                        val targetUrl = "https://api.github.com/repos/$repo/releases/latest"
+                        val request = Request.Builder()
+                            .url(targetUrl)
+                            .header("User-Agent", "ReminderApp-Android")
+                            .header("Accept", "application/vnd.github.v3+json")
+                            .build()
 
-                    val response = httpClient.newCall(request).execute()
-                    val responseCode = response.code
-                    val responseBody = response.body?.string() ?: ""
+                        val response = httpClient.newCall(request).execute()
+                        if (response.isSuccessful) {
+                            val json = JSONObject(response.body?.string() ?: "")
+                            tagName = json.optString("tag_name", "").removePrefix("v").removePrefix("V")
+                            releaseNotes = json.optString("body", "Important stability, alarm accuracy, and notification improvements.")
+                            htmlUrl = json.optString("html_url", "https://github.com/$repo/releases")
+                            downloadUrl = htmlUrl
 
-                    if (response.isSuccessful) {
-                        val json = JSONObject(responseBody)
-                        tagName = json.optString("tag_name", "").removePrefix("v").removePrefix("V")
-                        releaseNotes = json.optString("body", "Important stability, alarm accuracy, and notification improvements.")
-                        htmlUrl = json.optString("html_url", "https://github.com/$repo/releases")
-                        downloadUrl = htmlUrl
-
-                        val assets = json.optJSONArray("assets")
-                        if (assets != null && assets.length() > 0) {
-                            for (i in 0 until assets.length()) {
-                                val asset = assets.getJSONObject(i)
-                                val name = asset.optString("name", "")
-                                if (name.endsWith(".apk", ignoreCase = true)) {
-                                    downloadUrl = asset.optString("browser_download_url", htmlUrl)
-                                    break
+                            val assets = json.optJSONArray("assets")
+                            if (assets != null && assets.length() > 0) {
+                                for (i in 0 until assets.length()) {
+                                    val asset = assets.getJSONObject(i)
+                                    val name = asset.optString("name", "")
+                                    if (name.endsWith(".apk", ignoreCase = true)) {
+                                        downloadUrl = asset.optString("browser_download_url", htmlUrl)
+                                        break
+                                    }
                                 }
                             }
+                            if (tagName.isNotBlank()) success = true
                         }
-                    } else if (responseCode == 404) {
+                    } catch (e: Exception) {
+                        // ignore and try next fallback
+                    }
+
+                    // 2. If releases/latest was not found or 404 (e.g. prerelease or rate-limited), try /releases list
+                    if (!success) {
+                        try {
+                            val listUrl = "https://api.github.com/repos/$repo/releases"
+                            val listReq = Request.Builder()
+                                .url(listUrl)
+                                .header("User-Agent", "ReminderApp-Android")
+                                .header("Accept", "application/vnd.github.v3+json")
+                                .build()
+                            val listResp = httpClient.newCall(listReq).execute()
+                            if (listResp.isSuccessful) {
+                                val array = org.json.JSONArray(listResp.body?.string() ?: "[]")
+                                if (array.length() > 0) {
+                                    val json = array.getJSONObject(0)
+                                    tagName = json.optString("tag_name", "").removePrefix("v").removePrefix("V")
+                                    releaseNotes = json.optString("body", "Important stability and alarm improvements.")
+                                    htmlUrl = json.optString("html_url", "https://github.com/$repo/releases")
+                                    downloadUrl = htmlUrl
+                                    val assets = json.optJSONArray("assets")
+                                    if (assets != null && assets.length() > 0) {
+                                        for (i in 0 until assets.length()) {
+                                            val asset = assets.getJSONObject(i)
+                                            val name = asset.optString("name", "")
+                                            if (name.endsWith(".apk", ignoreCase = true)) {
+                                                downloadUrl = asset.optString("browser_download_url", htmlUrl)
+                                                break
+                                            }
+                                        }
+                                    }
+                                    if (tagName.isNotBlank()) success = true
+                                }
+                            }
+                        } catch (e: Exception) {
+                            // ignore and try HTML scraping
+                        }
+                    }
+
+                    // 3. Fallback to scraping public releases HTML (bypasses API rate limits)
+                    if (!success) {
+                        try {
+                            val fallbackRequest = Request.Builder()
+                                .url("https://github.com/$repo/releases")
+                                .header("User-Agent", "Mozilla/5.0 (Linux; Android 14)")
+                                .build()
+                            val fallbackResponse = httpClient.newCall(fallbackRequest).execute()
+                            if (fallbackResponse.isSuccessful) {
+                                val html = fallbackResponse.body?.string() ?: ""
+                                val tagMatcher = Pattern.compile("releases/tag/([^\"'\\s/]+)").matcher(html)
+                                if (tagMatcher.find()) {
+                                    tagName = tagMatcher.group(1).removePrefix("v").removePrefix("V")
+                                    htmlUrl = "https://github.com/$repo/releases/tag/v$tagName"
+                                    
+                                    val apkMatcher = Pattern.compile("releases/download/[^\"'\\s]+\\.apk").matcher(html)
+                                    downloadUrl = if (apkMatcher.find()) {
+                                        "https://github.com/" + apkMatcher.group(0).removePrefix("/")
+                                    } else {
+                                        "https://github.com/$repo/releases/download/v$tagName/Reminder.apk"
+                                    }
+                                    releaseNotes = "Update version $tagName released on GitHub."
+                                    success = true
+                                }
+                            }
+                        } catch (e: Exception) {
+                            // ignore
+                        }
+                    }
+
+                    if (!success) {
                         withContext(Dispatchers.Main) {
                             onResult(
                                 UpdateCheckResult.Error(
-                                    "Connected to GitHub repository '$repo' successfully!\n\nNo Releases have been published yet on this repository. To publish your first update, draft a release on GitHub with tag v1.1 and attach your APK file."
+                                    "Connected to GitHub repo '$repo' successfully!\n\nNo published releases found yet. Draft a release on GitHub with tag v1.1 and attach your APK file to push updates."
                                 )
                             )
                         }
                         return@launch
-                    } else {
-                        // Rate limit (403) or other error -> Fallback to scraping public release page
-                        val fallbackRequest = Request.Builder()
-                            .url("https://github.com/$repo/releases")
-                            .header("User-Agent", "Mozilla/5.0 (Android)")
-                            .build()
-                        val fallbackResponse = httpClient.newCall(fallbackRequest).execute()
-                        if (fallbackResponse.isSuccessful) {
-                            val html = fallbackResponse.body?.string() ?: ""
-                            val tagMatcher = Pattern.compile("/$repo/releases/tag/([^\"/\\s]+)").matcher(html)
-                            if (tagMatcher.find()) {
-                                tagName = tagMatcher.group(1).removePrefix("v").removePrefix("V")
-                                htmlUrl = "https://github.com/$repo/releases/tag/v$tagName"
-                                downloadUrl = "https://github.com/$repo/releases/download/v$tagName/Reminder.apk"
-                                releaseNotes = "Update version $tagName released on GitHub."
-                            } else {
-                                withContext(Dispatchers.Main) {
-                                    onResult(
-                                        UpdateCheckResult.Error(
-                                            "Connected to GitHub repository '$repo'. No releases found yet. Draft a release on GitHub with tag v1.1 to publish an update."
-                                        )
-                                    )
-                                }
-                                return@launch
-                            }
-                        } else {
-                            withContext(Dispatchers.Main) {
-                                onResult(UpdateCheckResult.Error("GitHub returned code $responseCode. Please verify network connection."))
-                            }
-                            return@launch
-                        }
                     }
                 }
 
