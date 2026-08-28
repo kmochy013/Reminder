@@ -123,12 +123,43 @@ object AppUpdateManager {
         NotificationHelper.cancelNotification(context, NotificationHelper.NOTIFICATION_ID_UPDATE.toLong())
     }
 
+    fun sanitizeGitHubRepo(input: String): String {
+        var cleaned = input.trim()
+        cleaned = cleaned.removePrefix("https://github.com/")
+            .removePrefix("http://github.com/")
+            .removePrefix("github.com/")
+        cleaned = cleaned.removeSuffix("/releases")
+            .removeSuffix("/releases/")
+            .removeSuffix("/")
+        return cleaned.trim()
+    }
+
+    const val DEFAULT_GITHUB_REPO = "kmochy013/Reminder"
+
+    fun isPlaceholderRepo(repo: String): Boolean {
+        val sanitized = sanitizeGitHubRepo(repo)
+        return sanitized.isBlank() ||
+                sanitized.equals("reminder-app", ignoreCase = true) ||
+                sanitized.equals("reminder-app/release", ignoreCase = true) ||
+                sanitized.equals("reminder-app/releases", ignoreCase = true) ||
+                sanitized.equals("username/repository", ignoreCase = true) ||
+                sanitized.equals("owner/repository", ignoreCase = true)
+    }
+
     fun getGitHubRepo(context: Context): String {
-        return getPrefs(context).getString(KEY_GITHUB_REPO, "reminder-app/release") ?: "reminder-app/release"
+        val stored = getPrefs(context).getString(KEY_GITHUB_REPO, DEFAULT_GITHUB_REPO) ?: DEFAULT_GITHUB_REPO
+        val sanitized = sanitizeGitHubRepo(stored)
+        if (isPlaceholderRepo(sanitized)) {
+            // Auto-upgrade to user's real repository
+            setGitHubRepo(context, DEFAULT_GITHUB_REPO)
+            return DEFAULT_GITHUB_REPO
+        }
+        return sanitized
     }
 
     fun setGitHubRepo(context: Context, repo: String) {
-        getPrefs(context).edit().putString(KEY_GITHUB_REPO, repo.trim()).apply()
+        val sanitized = sanitizeGitHubRepo(repo)
+        getPrefs(context).edit().putString(KEY_GITHUB_REPO, sanitized).apply()
     }
 
     fun getCustomFeedUrl(context: Context): String {
@@ -153,6 +184,18 @@ object AppUpdateManager {
                 val customUrl = getCustomFeedUrl(context)
                 val repo = getGitHubRepo(context)
 
+                // If user hasn't configured their actual GitHub repo yet, guide them directly
+                if (customUrl.isBlank() && isPlaceholderRepo(repo)) {
+                    withContext(Dispatchers.Main) {
+                        onResult(
+                            UpdateCheckResult.Error(
+                                "No releases found on GitHub repo ($repo). That was a sample placeholder. To check real updates, enter your GitHub 'username/repo' below, or tap 'Test Mandatory Update' to simulate an update right now."
+                            )
+                        )
+                    }
+                    return@launch
+                }
+
                 val targetUrl = if (customUrl.isNotBlank()) {
                     customUrl
                 } else {
@@ -172,8 +215,15 @@ object AppUpdateManager {
                     withContext(Dispatchers.Main) {
                         onResult(
                             UpdateCheckResult.Error(
-                                if (code == 404) "No releases found on GitHub repo ($repo). Please configure a valid repo or test with 'Test Mandatory Update'."
-                                else "Server returned HTTP $code while checking for updates."
+                                if (code == 404) {
+                                    if (isPlaceholderRepo(repo)) {
+                                        "No releases found on GitHub repo ($repo). That was a template placeholder. Please enter your GitHub username and repository name below."
+                                    } else {
+                                        "Connected to GitHub repository '$repo' successfully!\n\nNo Releases have been published yet on this repository. To publish your first update, draft a release on GitHub with tag v1.1 and attach your APK file."
+                                    }
+                                } else {
+                                    "Server returned HTTP $code while checking for updates."
+                                }
                             )
                         )
                     }
