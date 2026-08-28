@@ -5,6 +5,8 @@ import androidx.test.core.app.ApplicationProvider
 import com.example.data.model.Priority
 import com.example.data.model.ReminderItem
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNotNull
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -84,6 +86,23 @@ class ExampleRobolectricTest {
     // Verify notification manager received it without crash
     val notificationManager = androidx.core.app.NotificationManagerCompat.from(context)
     assertTrue(notificationManager.areNotificationsEnabled())
+  }
+
+  @Test
+  fun `simulateMandatoryUpdate sets active update and can be cleared`() {
+    val context = ApplicationProvider.getApplicationContext<Context>()
+    val info = com.example.update.AppUpdateManager.simulateMandatoryUpdate(context)
+    assertTrue(info.isMandatory)
+    assertTrue(info.versionCode > com.example.update.AppUpdateManager.CURRENT_VERSION_CODE)
+
+    val pending = com.example.update.AppUpdateManager.getPendingMandatoryUpdate(context)
+    assertNotNull(pending)
+    assertEquals(info.versionCode, pending?.versionCode)
+    assertEquals(info.versionName, pending?.versionName)
+
+    com.example.update.AppUpdateManager.clearMandatoryUpdate(context)
+    val cleared = com.example.update.AppUpdateManager.getPendingMandatoryUpdate(context)
+    assertNull(cleared)
   }
 }
 

@@ -8,6 +8,9 @@ import android.content.SharedPreferences
 import com.example.notification.NotificationHelper
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import okhttp3.OkHttpClient
@@ -20,7 +23,7 @@ data class AppVersionInfo(
     val versionName: String,
     val releaseNotes: String,
     val downloadUrl: String,
-    val isMandatory: Boolean = false
+    val isMandatory: Boolean = true
 )
 
 sealed class UpdateCheckResult {
@@ -39,6 +42,15 @@ object AppUpdateManager {
     private const val KEY_CUSTOM_FEED_URL = "custom_feed_url"
     private const val KEY_LAST_CHECK_TIME = "last_check_time"
 
+    private const val KEY_MANDATORY_ACTIVE = "mandatory_update_active"
+    private const val KEY_MANDATORY_VERSION_CODE = "mandatory_version_code"
+    private const val KEY_MANDATORY_VERSION_NAME = "mandatory_version_name"
+    private const val KEY_MANDATORY_NOTES = "mandatory_notes"
+    private const val KEY_MANDATORY_URL = "mandatory_url"
+
+    private val _mandatoryUpdateFlow = MutableStateFlow<AppVersionInfo?>(null)
+    val mandatoryUpdateFlow: StateFlow<AppVersionInfo?> = _mandatoryUpdateFlow.asStateFlow()
+
     private val httpClient = OkHttpClient.Builder()
         .connectTimeout(10, TimeUnit.SECONDS)
         .readTimeout(10, TimeUnit.SECONDS)
@@ -46,6 +58,69 @@ object AppUpdateManager {
 
     private fun getPrefs(context: Context): SharedPreferences {
         return context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+    }
+
+    /**
+     * Initializes update state from stored preferences.
+     * If the app was updated to a newer version than the saved mandatory update,
+     * it automatically clears the mandatory lock.
+     */
+    fun initUpdateState(context: Context) {
+        val prefs = getPrefs(context)
+        val isActive = prefs.getBoolean(KEY_MANDATORY_ACTIVE, false)
+        val savedCode = prefs.getInt(KEY_MANDATORY_VERSION_CODE, 0)
+
+        if (isActive && savedCode > CURRENT_VERSION_CODE) {
+            val info = AppVersionInfo(
+                versionCode = savedCode,
+                versionName = prefs.getString(KEY_MANDATORY_VERSION_NAME, "1.1") ?: "1.1",
+                releaseNotes = prefs.getString(KEY_MANDATORY_NOTES, "Critical updates and reliability fixes.") ?: "",
+                downloadUrl = prefs.getString(KEY_MANDATORY_URL, "https://github.com/${getGitHubRepo(context)}/releases") ?: "",
+                isMandatory = true
+            )
+            _mandatoryUpdateFlow.value = info
+        } else if (isActive && savedCode <= CURRENT_VERSION_CODE) {
+            clearMandatoryUpdate(context)
+        }
+    }
+
+    fun getPendingMandatoryUpdate(context: Context): AppVersionInfo? {
+        val prefs = getPrefs(context)
+        val isActive = prefs.getBoolean(KEY_MANDATORY_ACTIVE, false)
+        val savedCode = prefs.getInt(KEY_MANDATORY_VERSION_CODE, 0)
+        if (isActive && savedCode > CURRENT_VERSION_CODE) {
+            return AppVersionInfo(
+                versionCode = savedCode,
+                versionName = prefs.getString(KEY_MANDATORY_VERSION_NAME, "1.1") ?: "1.1",
+                releaseNotes = prefs.getString(KEY_MANDATORY_NOTES, "") ?: "",
+                downloadUrl = prefs.getString(KEY_MANDATORY_URL, "") ?: "",
+                isMandatory = true
+            )
+        }
+        return null
+    }
+
+    fun setMandatoryUpdate(context: Context, info: AppVersionInfo) {
+        getPrefs(context).edit()
+            .putBoolean(KEY_MANDATORY_ACTIVE, true)
+            .putInt(KEY_MANDATORY_VERSION_CODE, info.versionCode)
+            .putString(KEY_MANDATORY_VERSION_NAME, info.versionName)
+            .putString(KEY_MANDATORY_NOTES, info.releaseNotes)
+            .putString(KEY_MANDATORY_URL, info.downloadUrl)
+            .apply()
+        _mandatoryUpdateFlow.value = info
+    }
+
+    fun clearMandatoryUpdate(context: Context) {
+        getPrefs(context).edit()
+            .putBoolean(KEY_MANDATORY_ACTIVE, false)
+            .remove(KEY_MANDATORY_VERSION_CODE)
+            .remove(KEY_MANDATORY_VERSION_NAME)
+            .remove(KEY_MANDATORY_NOTES)
+            .remove(KEY_MANDATORY_URL)
+            .apply()
+        _mandatoryUpdateFlow.value = null
+        NotificationHelper.cancelNotification(context, NotificationHelper.NOTIFICATION_ID_UPDATE.toLong())
     }
 
     fun getGitHubRepo(context: Context): String {
@@ -66,7 +141,7 @@ object AppUpdateManager {
 
     /**
      * Checks remote source (GitHub Releases or direct JSON feed) for a newer version.
-     * When a newer version is detected, it posts a high-priority system notification.
+     * When a newer version is detected, it enforces mandatory update and posts an auto-update notification.
      */
     fun checkForUpdates(
         context: Context,
@@ -97,7 +172,7 @@ object AppUpdateManager {
                     withContext(Dispatchers.Main) {
                         onResult(
                             UpdateCheckResult.Error(
-                                if (code == 404) "No releases found on GitHub repo ($repo). Make sure the repository exists and has a release."
+                                if (code == 404) "No releases found on GitHub repo ($repo). Please configure a valid repo or test with 'Test Mandatory Update'."
                                 else "Server returned HTTP $code while checking for updates."
                             )
                         )
@@ -110,7 +185,7 @@ object AppUpdateManager {
 
                 // Parse GitHub release format or standard version JSON
                 val tag = json.optString("tag_name", "").removePrefix("v")
-                val releaseNotes = json.optString("body", "Bug fixes and performance improvements.")
+                val releaseNotes = json.optString("body", "Important stability, alarm accuracy, and notification improvements.")
                 val htmlUrl = json.optString("html_url", "https://github.com/$repo/releases")
 
                 // Extract APK download URL if assets exist
@@ -127,7 +202,6 @@ object AppUpdateManager {
                     }
                 }
 
-                // Check version comparison
                 val latestVersionCode = json.optInt("version_code", parseVersionCode(tag))
                 val latestVersionName = if (tag.isNotBlank()) tag else json.optString("version_name", "1.1")
 
@@ -138,15 +212,19 @@ object AppUpdateManager {
                         versionCode = latestVersionCode,
                         versionName = latestVersionName,
                         releaseNotes = releaseNotes,
-                        downloadUrl = downloadUrl
+                        downloadUrl = downloadUrl,
+                        isMandatory = true // Update is necessary as requested
                     )
+
+                    setMandatoryUpdate(context, info)
 
                     if (notifyIfAvailable) {
                         NotificationHelper.showUpdateNotification(
                             context = context,
                             versionName = info.versionName,
                             releaseNotes = info.releaseNotes,
-                            downloadUrl = info.downloadUrl
+                            downloadUrl = info.downloadUrl,
+                            isMandatory = true
                         )
                     }
 
@@ -154,6 +232,7 @@ object AppUpdateManager {
                         onResult(UpdateCheckResult.UpdateAvailable(info))
                     }
                 } else {
+                    clearMandatoryUpdate(context)
                     withContext(Dispatchers.Main) {
                         onResult(UpdateCheckResult.UpToDate(CURRENT_VERSION_NAME))
                     }
@@ -182,27 +261,41 @@ object AppUpdateManager {
     }
 
     /**
-     * Broadcasts / posts a sample update notification so the developer and user can
-     * immediately experience how the update notification looks and works.
+     * Activates a mandatory update simulation immediately.
+     * Posts the auto update heads-up notification and locks the app with the Mandatory Update screen.
      */
-    fun triggerSampleUpdateNotification(context: Context) {
+    fun simulateMandatoryUpdate(context: Context): AppVersionInfo {
         val sampleInfo = AppVersionInfo(
             versionCode = CURRENT_VERSION_CODE + 1,
             versionName = "1.1.0",
-            releaseNotes = "• Added Mosque & Birthday recurring reminders\n• Improved repeating alert reliability\n• Custom alert ringtones\n• UI performance polish",
-            downloadUrl = "https://github.com/${getGitHubRepo(context)}/releases"
+            releaseNotes = "• Mosque / Friday recurring reminders with auto-reschedule\n• Birthday & yearly anniversary alert engine\n• 1-minute alert repetition reliability\n• Mandatory security and alarm scheduling update",
+            downloadUrl = "https://github.com/${getGitHubRepo(context)}/releases",
+            isMandatory = true
         )
+
+        setMandatoryUpdate(context, sampleInfo)
 
         NotificationHelper.showUpdateNotification(
             context = context,
             versionName = sampleInfo.versionName,
             releaseNotes = sampleInfo.releaseNotes,
-            downloadUrl = sampleInfo.downloadUrl
+            downloadUrl = sampleInfo.downloadUrl,
+            isMandatory = true
         )
+
+        return sampleInfo
     }
 
     /**
-     * Schedules a daily background update check via AlarmManager so installed phones
+     * Broadcasts / posts a sample update notification so the developer and user can
+     * immediately experience how the update notification looks and works.
+     */
+    fun triggerSampleUpdateNotification(context: Context) {
+        simulateMandatoryUpdate(context)
+    }
+
+    /**
+     * Schedules periodic background update checks via AlarmManager so installed phones
      * automatically check and notify when the developer publishes an update.
      */
     fun schedulePeriodicUpdateCheck(context: Context) {
@@ -215,8 +308,8 @@ object AppUpdateManager {
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
 
-        val triggerTime = System.currentTimeMillis() + 12 * 3600_000L // check in 12h
-        val interval = AlarmManager.INTERVAL_DAY
+        val triggerTime = System.currentTimeMillis() + 6 * 3600_000L // First check in 6h
+        val interval = AlarmManager.INTERVAL_HALF_DAY // Twice a day
 
         alarmManager.setInexactRepeating(
             AlarmManager.RTC_WAKEUP,

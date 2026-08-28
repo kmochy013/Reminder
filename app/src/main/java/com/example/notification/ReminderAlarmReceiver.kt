@@ -84,6 +84,12 @@ class ReminderAlarmReceiver : BroadcastReceiver() {
 
                     Intent.ACTION_BOOT_COMPLETED -> {
                         AlarmScheduler.rescheduleAllActiveReminders(context)
+                        com.example.update.AppUpdateManager.schedulePeriodicUpdateCheck(context)
+                        com.example.update.AppUpdateManager.checkForUpdates(
+                            context = context,
+                            notifyIfAvailable = true,
+                            onResult = { /* Handled via notification */ }
+                        )
                     }
                 }
             } catch (e: Exception) {

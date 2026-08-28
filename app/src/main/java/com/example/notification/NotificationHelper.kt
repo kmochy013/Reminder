@@ -191,7 +191,8 @@ object NotificationHelper {
         context: Context,
         versionName: String,
         releaseNotes: String,
-        downloadUrl: String
+        downloadUrl: String,
+        isMandatory: Boolean = true
     ) {
         createNotificationChannel(context)
 
@@ -206,12 +207,33 @@ object NotificationHelper {
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
 
+        // Intent to open app directly
+        val appIntent = Intent(context, MainActivity::class.java).apply {
+            flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
+        }
+        val appPendingIntent = PendingIntent.getActivity(
+            context,
+            NOTIFICATION_ID_UPDATE + 1,
+            appIntent,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
+
         val soundUri = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_NOTIFICATION)
 
-        val title = "🚀 New Update Available: v$versionName"
-        val message = "A new version of the Reminder app is ready to download! Tap to get the latest features and improvements."
+        val title = if (isMandatory) {
+            "⚠️ Mandatory Update Required: v$versionName"
+        } else {
+            "🚀 New Update Available: v$versionName"
+        }
+
+        val message = if (isMandatory) {
+            "A necessary update is required to continue using the app. Tap to download and install version $versionName now."
+        } else {
+            "A new version of the Reminder app is ready to download! Tap to get the latest features and improvements."
+        }
+
         val fullContent = if (releaseNotes.isNotBlank()) {
-            "$message\n\nWhat's New:\n$releaseNotes"
+            "$message\n\nWhat's New in v$versionName:\n$releaseNotes"
         } else message
 
         val notification = NotificationCompat.Builder(context, CHANNEL_ID_UPDATES)
@@ -222,18 +244,24 @@ object NotificationHelper {
                 NotificationCompat.BigTextStyle()
                     .bigText(fullContent)
                     .setBigContentTitle(title)
-                    .setSummaryText("Update available")
+                    .setSummaryText(if (isMandatory) "Update required to continue" else "Update available")
             )
-            .setPriority(NotificationCompat.PRIORITY_HIGH)
+            .setPriority(NotificationCompat.PRIORITY_MAX)
             .setCategory(NotificationCompat.CATEGORY_RECOMMENDATION)
             .setContentIntent(downloadPendingIntent)
-            .setAutoCancel(true)
+            .setAutoCancel(!isMandatory)
+            .setOngoing(isMandatory)
             .setSound(soundUri)
-            .setVibrate(longArrayOf(0, 250, 150, 250))
+            .setVibrate(longArrayOf(0, 300, 150, 300, 150, 300))
             .addAction(
                 android.R.drawable.stat_sys_download,
-                "Download Update",
+                "Download & Update",
                 downloadPendingIntent
+            )
+            .addAction(
+                android.R.drawable.ic_menu_info_details,
+                "Open App",
+                appPendingIntent
             )
             .build()
 

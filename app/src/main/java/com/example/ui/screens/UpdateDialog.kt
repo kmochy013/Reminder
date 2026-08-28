@@ -47,6 +47,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
@@ -276,25 +277,33 @@ fun UpdateDialog(
                     }
                 }
 
-                // Test Update Notification Button
-                OutlinedButton(
+                // Test Mandatory Update Notification & Lock Button
+                Button(
                     onClick = {
-                        AppUpdateManager.triggerSampleUpdateNotification(context)
-                        onNotificationSent("🚀 Update notification posted! Check your notification shade.")
+                        AppUpdateManager.simulateMandatoryUpdate(context)
+                        onDismiss()
+                        onNotificationSent("🚨 Mandatory Update triggered! System notification sent & screen locked.")
                     },
                     shape = RoundedCornerShape(12.dp),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = AlertRed
+                    ),
                     modifier = Modifier
                         .fillMaxWidth()
-                        .testTag("test_update_notification_button")
+                        .testTag("test_mandatory_update_button")
                 ) {
                     Icon(
                         imageVector = Icons.Default.NotificationsActive,
                         contentDescription = null,
                         modifier = Modifier.size(18.dp),
-                        tint = MaterialTheme.colorScheme.primary
+                        tint = Color.White
                     )
                     Spacer(modifier = Modifier.width(6.dp))
-                    Text("Test Update Notification (Instant)")
+                    Text(
+                        "Test Mandatory Update (Lock & Alert)",
+                        fontWeight = FontWeight.Bold,
+                        color = Color.White
+                    )
                 }
 
                 // GitHub Release Configuration

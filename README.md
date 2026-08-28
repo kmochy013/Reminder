@@ -12,7 +12,10 @@ A modern, high-precision Android reminder and task management application built 
   - **Every Friday (Mosque / Jumu'ah)**: Never miss Friday prayers or weekly gatherings.
   - **🎂 Yearly Birthdays & Anniversaries**: Automatically reschedules for next year upon acknowledgment.
   - **Daily & Monthly Cycles**: For medication routines, daily habits, and monthly bill payments.
-- 🚀 **App Update Notifications (Over-The-Air)**: Built-in update broadcaster. Whenever you release a new APK or update on GitHub Releases, every installed phone automatically receives a high-priority system notification to download and install the new version.
+- 🚀 **Automatic App Updates & Mandatory Enforcement**: 
+  - **Auto-Update Notifications**: Every device where the app is installed automatically checks for updates in the background (on device reboot, periodic schedule, and app startup) and delivers a high-priority system notification when a new version is released.
+  - **Mandatory Update Screen**: Updating is strictly required to continue using the application. Outdated versions are securely locked with an un-dismissible **App Update Required** screen that guides users directly to download and install the new release, preventing broken reminders or outdated alarm engines.
+  - **One-Tap Update Simulation**: Built-in test trigger in the Update Center allows instant testing of both the auto-notification and the mandatory lock screen directly on device.
 - 📬 **Interactive Heads-Up Notifications**: Rich system notifications featuring quick actions:
   - **✓ Mark as Read** — Instantly acknowledges the task and dismisses recurring alarms.
   - **⏰ Snooze (1 Min)** — Temporarily postpones the reminder for a quick grace period.

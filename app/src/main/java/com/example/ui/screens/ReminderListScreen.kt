@@ -58,6 +58,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -68,6 +69,7 @@ import com.example.data.model.Priority
 import com.example.data.model.ReminderItem
 import androidx.compose.material.icons.filled.SystemUpdate
 import com.example.ui.screens.UpdateDialog
+import com.example.ui.screens.MandatoryUpdateScreen
 import com.example.ui.components.FilterTabs
 import com.example.ui.components.PermissionRationaleCard
 import com.example.ui.components.QuickStatsHeader
@@ -79,6 +81,7 @@ import com.example.ui.theme.PrimaryIndigo
 import com.example.ui.theme.SuccessGreen
 import com.example.ui.viewmodel.FilterTab
 import com.example.ui.viewmodel.ReminderViewModel
+import com.example.update.AppUpdateManager
 import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -87,6 +90,19 @@ fun ReminderListScreen(
     viewModel: ReminderViewModel,
     modifier: Modifier = Modifier
 ) {
+    val context = LocalContext.current
+    val mandatoryUpdate by AppUpdateManager.mandatoryUpdateFlow.collectAsStateWithLifecycle()
+
+    if (mandatoryUpdate != null) {
+        MandatoryUpdateScreen(
+            versionInfo = mandatoryUpdate!!,
+            onDismissSimulation = {
+                AppUpdateManager.clearMandatoryUpdate(context)
+            }
+        )
+        return
+    }
+
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val snackbarHostState = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()

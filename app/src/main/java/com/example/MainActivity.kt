@@ -21,6 +21,9 @@ class MainActivity : ComponentActivity() {
         // Create the high priority notification channel
         NotificationHelper.createNotificationChannel(this)
 
+        // Initialize update state from storage
+        com.example.update.AppUpdateManager.initUpdateState(this)
+
         // Schedule periodic update checks & check once on launch
         com.example.update.AppUpdateManager.schedulePeriodicUpdateCheck(this)
         com.example.update.AppUpdateManager.checkForUpdates(
