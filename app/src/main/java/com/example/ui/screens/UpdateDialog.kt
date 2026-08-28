@@ -260,30 +260,39 @@ fun UpdateDialog(
                             border = BorderStroke(1.dp, SuccessGreen.copy(alpha = 0.3f)),
                             modifier = Modifier.fillMaxWidth()
                         ) {
-                            Row(
+                            Column(
                                 modifier = Modifier.padding(14.dp),
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(10.dp)
+                                verticalArrangement = Arrangement.spacedBy(8.dp)
                             ) {
-                                Icon(
-                                    imageVector = Icons.Default.CheckCircle,
-                                    contentDescription = null,
-                                    tint = SuccessGreen,
-                                    modifier = Modifier.size(24.dp)
-                                )
-                                Column {
-                                    Text(
-                                        text = "You're on the Latest Version!",
-                                        style = MaterialTheme.typography.titleSmall,
-                                        fontWeight = FontWeight.Bold,
-                                        color = SuccessGreen
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.CheckCircle,
+                                        contentDescription = null,
+                                        tint = SuccessGreen,
+                                        modifier = Modifier.size(24.dp)
                                     )
-                                    Text(
-                                        text = "Version ${result.currentVersion} is up to date.",
-                                        style = MaterialTheme.typography.bodySmall,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                                    )
+                                    Column {
+                                        Text(
+                                            text = "GitHub Connected & Up to Date!",
+                                            style = MaterialTheme.typography.titleSmall,
+                                            fontWeight = FontWeight.Bold,
+                                            color = SuccessGreen
+                                        )
+                                        Text(
+                                            text = "Installed v${result.currentVersion} • GitHub Release v${result.latestTag}",
+                                            style = MaterialTheme.typography.bodySmall,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                                        )
+                                    }
                                 }
+                                Text(
+                                    text = "Your app is currently running v${result.currentVersion}. When you publish a newer release on GitHub (e.g. tag 'v1.1' or 'v1.0.1') with an APK, all installed phones will immediately receive the update notification and lock screen.",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
                             }
                         }
                     }
