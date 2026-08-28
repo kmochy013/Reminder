@@ -1,6 +1,11 @@
 package com.example.ui.components
 
 import androidx.compose.animation.animateColorAsState
+
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.rememberScrollState
+import com.example.data.model.RecurrenceHelper
+import com.example.data.model.RecurrenceType
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
@@ -204,12 +209,21 @@ fun ReminderCard(
 
                     Spacer(modifier = Modifier.height(6.dp))
 
-                    // Category Pill and Priority Pill
+                    // Category Pill, Recurrence Pill and Priority Pill
                     Row(
                         horizontalArrangement = Arrangement.spacedBy(6.dp),
-                        verticalAlignment = Alignment.CenterVertically
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.horizontalScroll(rememberScrollState())
                     ) {
                         CategoryPill(category = reminder.category)
+
+                        if (reminder.isRecurring) {
+                            RecurrencePill(
+                                recurrence = reminder.recurrence,
+                                repeatDayOfWeek = reminder.repeatDayOfWeek
+                            )
+                        }
+
                         PriorityPill(priority = reminder.priority)
 
                         if (isRead) {
@@ -294,14 +308,33 @@ fun ReminderCard(
 
 @Composable
 private fun CategoryPill(category: String) {
+    val icon = RecurrenceHelper.getCategoryIcon(category)
     Text(
-        text = category,
+        text = "$icon $category",
         fontSize = 11.sp,
         fontWeight = FontWeight.Medium,
         color = MaterialTheme.colorScheme.onSecondaryContainer,
         modifier = Modifier
             .background(
                 MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.7f),
+                RoundedCornerShape(6.dp)
+            )
+            .padding(horizontal = 6.dp, vertical = 2.dp)
+    )
+}
+
+@Composable
+private fun RecurrencePill(recurrence: RecurrenceType, repeatDayOfWeek: Int?) {
+    val label = RecurrenceHelper.getRecurrenceLabel(recurrence, repeatDayOfWeek)
+    val icon = if (recurrence == RecurrenceType.YEARLY) "🎂" else "🔁"
+    Text(
+        text = "$icon $label",
+        fontSize = 11.sp,
+        fontWeight = FontWeight.SemiBold,
+        color = MaterialTheme.colorScheme.primary,
+        modifier = Modifier
+            .background(
+                MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.6f),
                 RoundedCornerShape(6.dp)
             )
             .padding(horizontal = 6.dp, vertical = 2.dp)

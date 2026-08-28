@@ -46,11 +46,30 @@ class ReminderAlarmReceiver : BroadcastReceiver() {
 
                     NotificationHelper.ACTION_MARK_READ -> {
                         if (reminderId != -1L) {
-                            // User clicked "Mark as Read" on notification action or in app
-                            dao.setReadStatus(reminderId, true)
+                            val reminder = dao.getReminderById(reminderId)
                             AlarmScheduler.cancelReminderAlarm(context, reminderId)
                             NotificationHelper.cancelNotification(context, reminderId)
-                            Log.d("ReminderReceiver", "Reminder $reminderId marked as read. Repeat alarms cancelled.")
+
+                            if (reminder != null && reminder.isRecurring) {
+                                // Recurring reminder (e.g. Weekly Friday Mosque or Birthday)
+                                val nextOccurrence = com.example.data.model.RecurrenceHelper.getNextOccurrence(
+                                    reminder.targetTimestamp,
+                                    reminder.recurrence,
+                                    reminder.repeatDayOfWeek
+                                )
+                                val updated = reminder.copy(
+                                    targetTimestamp = nextOccurrence,
+                                    isRead = false,
+                                    repeatCount = 0,
+                                    lastNotifiedAt = null
+                                )
+                                dao.updateReminder(updated)
+                                AlarmScheduler.scheduleReminderAlarm(context, updated.id, updated.targetTimestamp)
+                                Log.d("ReminderReceiver", "Recurring reminder $reminderId advanced to next occurrence: $nextOccurrence")
+                            } else {
+                                dao.setReadStatus(reminderId, true)
+                                Log.d("ReminderReceiver", "Reminder $reminderId marked as read. Repeat alarms cancelled.")
+                            }
                         }
                     }
 

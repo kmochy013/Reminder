@@ -125,16 +125,17 @@ fun FilterTabs(
         ) {
             categories.forEach { cat ->
                 val isSelected = selectedCategory.equals(cat, ignoreCase = true)
+                val icon = if (cat.equals("All", ignoreCase = true)) "" else com.example.data.model.RecurrenceHelper.getCategoryIcon(cat) + " "
                 FilterChip(
                     selected = isSelected,
                     onClick = { onCategorySelected(cat) },
-                    label = { Text(cat) },
+                    label = { Text("$icon$cat") },
                     shape = RoundedCornerShape(12.dp),
                     colors = FilterChipDefaults.filterChipColors(
                         selectedContainerColor = MaterialTheme.colorScheme.primaryContainer,
                         selectedLabelColor = MaterialTheme.colorScheme.onPrimaryContainer
                     ),
-                    modifier = Modifier.testTag("category_chip_${cat.lowercase()}")
+                    modifier = Modifier.testTag("category_chip_${cat.lowercase().replace(" ", "_").replace("/", "_")}")
                 )
             }
         }

@@ -9,9 +9,10 @@ import com.example.data.model.ReminderItem
 
 @Database(
     entities = [ReminderItem::class],
-    version = 1,
+    version = 2,
     exportSchema = false
 )
+@TypeConverters(Converters::class)
 abstract class ReminderDatabase : RoomDatabase() {
     abstract fun reminderDao(): ReminderDao
 

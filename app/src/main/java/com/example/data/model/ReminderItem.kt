@@ -16,11 +16,16 @@ data class ReminderItem(
     val repeatCount: Int = 0,
     val createdAt: Long = System.currentTimeMillis(),
     val lastNotifiedAt: Long? = null,
-    val colorTag: Long = 0xFF4A6CF7
+    val colorTag: Long = 0xFF4A6CF7,
+    val recurrence: RecurrenceType = RecurrenceType.NONE,
+    val repeatDayOfWeek: Int? = null
 ) {
     val isPassed: Boolean
         get() = System.currentTimeMillis() >= targetTimestamp
 
     val isNagging: Boolean
         get() = !isRead && isPassed
+
+    val isRecurring: Boolean
+        get() = recurrence != RecurrenceType.NONE
 }

@@ -66,6 +66,8 @@ import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.data.model.Priority
 import com.example.data.model.ReminderItem
+import androidx.compose.material.icons.filled.SystemUpdate
+import com.example.ui.screens.UpdateDialog
 import com.example.ui.components.FilterTabs
 import com.example.ui.components.PermissionRationaleCard
 import com.example.ui.components.QuickStatsHeader
@@ -91,6 +93,7 @@ fun ReminderListScreen(
 
     var showAddEditDialog by remember { mutableStateOf(false) }
     var reminderToEdit by remember { mutableStateOf<ReminderItem?>(null) }
+    var showUpdateDialog by remember { mutableStateOf(false) }
 
     Scaffold(
         modifier = modifier.fillMaxSize(),
@@ -135,6 +138,18 @@ fun ReminderListScreen(
                     }
                 },
                 actions = {
+                    // Check for App Updates button
+                    IconButton(
+                        onClick = { showUpdateDialog = true },
+                        modifier = Modifier.testTag("check_updates_icon_button")
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.SystemUpdate,
+                            contentDescription = "Check for App Updates",
+                            tint = MaterialTheme.colorScheme.primary
+                        )
+                    }
+
                     // Quick Test Alert button
                     Button(
                         onClick = {
@@ -239,7 +254,16 @@ fun ReminderListScreen(
                             onToggleRead = { isRead ->
                                 viewModel.toggleReadStatus(reminder, isRead)
                                 scope.launch {
-                                    val msg = if (isRead) "✓ Marked as read (repeat stopped)" else "Marked as unread"
+                                    val msg = if (isRead) {
+                                        if (reminder.isRecurring) {
+                                            val label = com.example.data.model.RecurrenceHelper.getRecurrenceLabel(reminder.recurrence, reminder.repeatDayOfWeek)
+                                            "✓ Acknowledged for today! Rescheduled for next cycle ($label)"
+                                        } else {
+                                            "✓ Marked as read (repeat alerts stopped)"
+                                        }
+                                    } else {
+                                        "Marked as unread"
+                                    }
                                     snackbarHostState.showSnackbar(msg)
                                 }
                             },
@@ -273,7 +297,7 @@ fun ReminderListScreen(
                     showAddEditDialog = false
                     reminderToEdit = null
                 },
-                onSave = { title, description, targetTimestamp, category, priority ->
+                onSave = { title, description, targetTimestamp, category, priority, recurrence, repeatDayOfWeek ->
                     if (reminderToEdit != null) {
                         viewModel.updateReminder(
                             reminderToEdit!!.copy(
@@ -282,16 +306,32 @@ fun ReminderListScreen(
                                 targetTimestamp = targetTimestamp,
                                 category = category,
                                 priority = priority,
+                                recurrence = recurrence,
+                                repeatDayOfWeek = repeatDayOfWeek,
                                 isRead = false
                             )
                         )
                         scope.launch { snackbarHostState.showSnackbar("Reminder updated") }
                     } else {
-                        viewModel.addReminder(title, description, targetTimestamp, category, priority)
-                        scope.launch { snackbarHostState.showSnackbar("Reminder scheduled!") }
+                        viewModel.addReminder(title, description, targetTimestamp, category, priority, recurrence, repeatDayOfWeek)
+                        val recurMsg = if (recurrence != com.example.data.model.RecurrenceType.NONE) {
+                            " (${com.example.data.model.RecurrenceHelper.getRecurrenceLabel(recurrence, repeatDayOfWeek)})"
+                        } else ""
+                        scope.launch { snackbarHostState.showSnackbar("Reminder scheduled!$recurMsg") }
                     }
                     showAddEditDialog = false
                     reminderToEdit = null
+                }
+            )
+        }
+
+        if (showUpdateDialog) {
+            UpdateDialog(
+                onDismiss = { showUpdateDialog = false },
+                onNotificationSent = { msg ->
+                    scope.launch {
+                        snackbarHostState.showSnackbar(msg)
+                    }
                 }
             )
         }

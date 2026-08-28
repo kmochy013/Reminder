@@ -8,11 +8,16 @@ A modern, high-precision Android reminder and task management application built 
 
 - ⏰ **Precise Alarm Scheduling**: Schedule tasks and alerts down to the exact second using Android's `AlarmManager` with `setExactAndAllowWhileIdle` support.
 - 🔁 **Smart 1-Minute Repeat Loop**: If a reminder fires and remains unread, the app automatically re-alerts every 60 seconds with a repetition counter until you check it off.
+- 🕌 **Recurring Events & Custom Schedules**: Built-in support for flexible repeating patterns:
+  - **Every Friday (Mosque / Jumu'ah)**: Never miss Friday prayers or weekly gatherings.
+  - **🎂 Yearly Birthdays & Anniversaries**: Automatically reschedules for next year upon acknowledgment.
+  - **Daily & Monthly Cycles**: For medication routines, daily habits, and monthly bill payments.
+- 🚀 **App Update Notifications (Over-The-Air)**: Built-in update broadcaster. Whenever you release a new APK or update on GitHub Releases, every installed phone automatically receives a high-priority system notification to download and install the new version.
 - 📬 **Interactive Heads-Up Notifications**: Rich system notifications featuring quick actions:
   - **✓ Mark as Read** — Instantly acknowledges the task and dismisses recurring alarms.
   - **⏰ Snooze (1 Min)** — Temporarily postpones the reminder for a quick grace period.
 - 🎨 **Elegant Dark UI**: Designed according to Material Design 3 guidelines with deep charcoal surfaces, vibrant lavender highlights, and clear visual hierarchies.
-- 🏷️ **Categorization & Priority Tags**: Organize reminders across categories (*Work*, *Personal*, *Health*, *Study*, *Finance*, *Urgent*) and 4 priority tiers (*Low*, *Medium*, *High*, *Urgent*).
+- 🏷️ **Categorization & Priority Tags**: Organize reminders across categories (*Mosque*, *Birthday*, *Work*, *Personal*, *Health*, *Study*, *Finance*, *Urgent*) with dedicated emojis and 4 priority tiers (*Low*, *Medium*, *High*, *Urgent*).
 - 🔍 **Fast Search & Filtering**: Real-time keyword filtering, status tabs (*All*, *Upcoming*, *Active Alerts*, *Read / Done*), and dynamic category chips.
 - ⚡ **Instant Test Alert**: Built-in 3-second simulation trigger to test notification banners, sounds, and repeat behaviors on device.
 - 🔒 **100% Offline & Private**: All data is securely stored on-device using SQLite via Room Database. No account creation or external server tracking required.

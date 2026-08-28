@@ -32,7 +32,9 @@ data class ReminderUiState(
     val selectedTab: FilterTab = FilterTab.ALL,
     val selectedCategory: String = "All",
     val searchQuery: String = "",
-    val availableCategories: List<String> = listOf("All", "General", "Work", "Personal", "Health", "Study", "Finance", "Urgent")
+    val availableCategories: List<String> = listOf(
+        "All", "Birthday", "Mosque / Prayer", "General", "Work", "Personal", "Health", "Study", "Finance", "Urgent"
+    )
 )
 
 class ReminderViewModel(application: Application) : AndroidViewModel(application) {
@@ -79,7 +81,7 @@ class ReminderViewModel(application: Application) : AndroidViewModel(application
             matchesTab && matchesCategory && matchesQuery
         }
 
-        val dynamicCategories = (listOf("All", "General", "Work", "Personal", "Health", "Study", "Finance", "Urgent") +
+        val dynamicCategories = (listOf("All", "Birthday", "Mosque / Prayer", "General", "Work", "Personal", "Health", "Study", "Finance", "Urgent") +
                 allReminders.map { it.category }).distinct()
 
         ReminderUiState(
@@ -113,15 +115,35 @@ class ReminderViewModel(application: Application) : AndroidViewModel(application
 
     fun toggleReadStatus(reminder: ReminderItem, isRead: Boolean) {
         viewModelScope.launch {
-            repository.setReadStatus(reminder.id, isRead)
             val context = getApplication<Application>()
             if (isRead) {
                 // If marked as Read/Done:
                 // Stop 1-minute nag alerts and clear notification banner!
                 AlarmScheduler.cancelReminderAlarm(context, reminder.id)
                 NotificationHelper.cancelNotification(context, reminder.id)
+
+                if (reminder.isRecurring) {
+                    // Recurring reminder (e.g. Weekly Friday Mosque, Yearly Birthday, Daily, etc.)
+                    // Automatically advance to the next occurrence!
+                    val nextOccurrence = com.example.data.model.RecurrenceHelper.getNextOccurrence(
+                        reminder.targetTimestamp,
+                        reminder.recurrence,
+                        reminder.repeatDayOfWeek
+                    )
+                    val updated = reminder.copy(
+                        targetTimestamp = nextOccurrence,
+                        isRead = false,
+                        repeatCount = 0,
+                        lastNotifiedAt = null
+                    )
+                    repository.updateReminder(updated)
+                    AlarmScheduler.scheduleReminderAlarm(context, updated.id, updated.targetTimestamp)
+                } else {
+                    repository.setReadStatus(reminder.id, true)
+                }
             } else {
                 // Unchecked/marked as unread:
+                repository.setReadStatus(reminder.id, false)
                 if (reminder.targetTimestamp <= System.currentTimeMillis()) {
                     // Overdue -> start repeating reminder
                     AlarmScheduler.scheduleOneMinuteRepeatAlarm(context, reminder.id)
@@ -137,7 +159,9 @@ class ReminderViewModel(application: Application) : AndroidViewModel(application
         description: String,
         targetTimestamp: Long,
         category: String,
-        priority: Priority
+        priority: Priority,
+        recurrence: com.example.data.model.RecurrenceType = com.example.data.model.RecurrenceType.NONE,
+        repeatDayOfWeek: Int? = null
     ) {
         viewModelScope.launch {
             val colorTag = when (priority) {
@@ -155,7 +179,9 @@ class ReminderViewModel(application: Application) : AndroidViewModel(application
                 priority = priority,
                 isRead = false,
                 repeatCount = 0,
-                colorTag = colorTag
+                colorTag = colorTag,
+                recurrence = recurrence,
+                repeatDayOfWeek = repeatDayOfWeek
             )
 
             val id = repository.insertReminder(newReminder)
