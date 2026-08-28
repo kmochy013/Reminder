@@ -24,11 +24,14 @@ import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.CloudDownload
 import androidx.compose.material.icons.filled.ErrorOutline
+import androidx.compose.material.icons.filled.Info
+import androidx.compose.material.icons.filled.KeyboardArrowDown
+import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material.icons.filled.NotificationsActive
 import androidx.compose.material.icons.filled.OpenInBrowser
 import androidx.compose.material.icons.filled.Refresh
-import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.SystemUpdate
+import androidx.compose.material.icons.filled.WarningAmber
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
@@ -38,10 +41,10 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -59,10 +62,6 @@ import androidx.compose.ui.window.DialogProperties
 import android.os.Build
 import android.provider.Settings
 import androidx.core.app.NotificationManagerCompat
-import androidx.compose.material.icons.filled.Info
-import androidx.compose.material.icons.filled.WarningAmber
-import androidx.compose.material.icons.filled.KeyboardArrowDown
-import androidx.compose.material.icons.filled.KeyboardArrowUp
 import com.example.ui.theme.AlertRed
 import com.example.ui.theme.SuccessGreen
 import com.example.ui.theme.WarningAmber
@@ -78,12 +77,21 @@ fun UpdateDialog(
     val context = LocalContext.current
     var isChecking by remember { mutableStateOf(false) }
     var updateResult by remember { mutableStateOf<UpdateCheckResult?>(null) }
-    var repoName by remember { mutableStateOf(AppUpdateManager.getGitHubRepo(context)) }
-    var showRepoConfig by remember { mutableStateOf(AppUpdateManager.isPlaceholderRepo(repoName)) }
     var showGuide by remember { mutableStateOf(false) }
-    var showTroubleshooting by remember { mutableStateOf(false) }
     var notificationsEnabled by remember {
         mutableStateOf(NotificationManagerCompat.from(context).areNotificationsEnabled())
+    }
+
+    // Automatically perform a live check upon opening the dialog
+    LaunchedEffect(Unit) {
+        isChecking = true
+        AppUpdateManager.checkForUpdates(
+            context = context,
+            notifyIfAvailable = true
+        ) { res ->
+            isChecking = false
+            updateResult = res
+        }
     }
 
     Dialog(
@@ -136,7 +144,7 @@ fun UpdateDialog(
                                 fontWeight = FontWeight.Bold
                             )
                             Text(
-                                text = "Installed: v${AppUpdateManager.CURRENT_VERSION_NAME} (Build ${AppUpdateManager.CURRENT_VERSION_CODE})",
+                                text = "Installed: v${AppUpdateManager.CURRENT_VERSION_NAME} • Built-in Auto Update",
                                 style = MaterialTheme.typography.labelMedium,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
@@ -176,14 +184,14 @@ fun UpdateDialog(
                                     modifier = Modifier.size(20.dp)
                                 )
                                 Text(
-                                    text = "Notifications Blocked on Device",
+                                    text = "Notifications Disabled on Device",
                                     style = MaterialTheme.typography.titleSmall,
                                     fontWeight = FontWeight.Bold,
                                     color = AlertRed
                                 )
                             }
                             Text(
-                                text = "Android is currently blocking notifications for this app. You won't receive update alerts until notifications are enabled in your device settings.",
+                                text = "Notifications are disabled. Enable them to get automatic heads-up alerts whenever a new version is released.",
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurface
                             )
@@ -221,19 +229,19 @@ fun UpdateDialog(
                             ),
                             modifier = Modifier.fillMaxWidth()
                         ) {
-                            Column(
+                            Row(
                                 modifier = Modifier.padding(14.dp),
-                                verticalArrangement = Arrangement.spacedBy(6.dp)
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(10.dp)
                             ) {
-                                Text(
-                                    text = "Automatic Updates for All Users",
-                                    style = MaterialTheme.typography.titleSmall,
-                                    fontWeight = FontWeight.Bold
+                                CircularProgressIndicator(
+                                    modifier = Modifier.size(20.dp),
+                                    strokeWidth = 2.dp
                                 )
                                 Text(
-                                    text = "Whenever you release a new version or APK, all phones where this app is installed receive a system notification to download the update.",
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    text = "Checking for new releases on GitHub...",
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = MaterialTheme.colorScheme.onSurface
                                 )
                             }
                         }
@@ -276,20 +284,20 @@ fun UpdateDialog(
                                     )
                                     Column {
                                         Text(
-                                            text = "GitHub Connected & Up to Date!",
+                                            text = "App is Up to Date!",
                                             style = MaterialTheme.typography.titleSmall,
                                             fontWeight = FontWeight.Bold,
                                             color = SuccessGreen
                                         )
                                         Text(
-                                            text = "Installed v${result.currentVersion} • GitHub Release v${result.latestTag}",
+                                            text = "Running v${result.currentVersion} • Built-in Auto Updater Active",
                                             style = MaterialTheme.typography.bodySmall,
                                             color = MaterialTheme.colorScheme.onSurfaceVariant
                                         )
                                     }
                                 }
                                 Text(
-                                    text = "Your app is currently running v${result.currentVersion}. When you publish a newer release on GitHub (e.g. tag 'v1.1' or 'v1.0.1') with an APK, all installed phones will immediately receive the update notification and lock screen.",
+                                    text = "Whenever you publish a newer release (e.g. tag 'v1.1' or 'v1.2') with an APK on GitHub, this app and all installed devices will automatically display a notification and lock screen to update immediately.",
                                     style = MaterialTheme.typography.bodySmall,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant
                                 )
@@ -298,15 +306,14 @@ fun UpdateDialog(
                     }
 
                     is UpdateCheckResult.Error -> {
-                        val isNoReleasesYet = !AppUpdateManager.isPlaceholderRepo(repoName)
                         Card(
                             shape = RoundedCornerShape(14.dp),
                             colors = CardDefaults.cardColors(
-                                containerColor = if (isNoReleasesYet) MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.25f) else AlertRed.copy(alpha = 0.08f)
+                                containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.25f)
                             ),
                             border = BorderStroke(
                                 1.dp,
-                                if (isNoReleasesYet) MaterialTheme.colorScheme.primary.copy(alpha = 0.35f) else AlertRed.copy(alpha = 0.35f)
+                                MaterialTheme.colorScheme.primary.copy(alpha = 0.35f)
                             ),
                             modifier = Modifier.fillMaxWidth()
                         ) {
@@ -319,16 +326,16 @@ fun UpdateDialog(
                                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                                 ) {
                                     Icon(
-                                        imageVector = if (isNoReleasesYet) Icons.Default.Info else Icons.Default.ErrorOutline,
+                                        imageVector = Icons.Default.Info,
                                         contentDescription = null,
-                                        tint = if (isNoReleasesYet) MaterialTheme.colorScheme.primary else AlertRed,
+                                        tint = MaterialTheme.colorScheme.primary,
                                         modifier = Modifier.size(22.dp)
                                     )
                                     Text(
-                                        text = if (isNoReleasesYet) "Repo Connected • No Releases Yet" else "GitHub Release Not Found",
+                                        text = "Auto Update Ready",
                                         style = MaterialTheme.typography.titleSmall,
                                         fontWeight = FontWeight.Bold,
-                                        color = if (isNoReleasesYet) MaterialTheme.colorScheme.primary else AlertRed
+                                        color = MaterialTheme.colorScheme.primary
                                     )
                                 }
                                 Text(
@@ -338,73 +345,28 @@ fun UpdateDialog(
                                     lineHeight = 18.sp
                                 )
 
-                                Row(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                Button(
+                                    onClick = {
+                                        val intent = Intent(
+                                            Intent.ACTION_VIEW,
+                                            Uri.parse("https://github.com/${AppUpdateManager.DEFAULT_GITHUB_REPO}/releases")
+                                        ).apply { flags = Intent.FLAG_ACTIVITY_NEW_TASK }
+                                        try {
+                                            context.startActivity(intent)
+                                        } catch (e: Exception) {
+                                            // ignore
+                                        }
+                                    },
+                                    shape = RoundedCornerShape(10.dp),
+                                    modifier = Modifier.fillMaxWidth()
                                 ) {
-                                    if (isNoReleasesYet) {
-                                        Button(
-                                            onClick = {
-                                                val intent = Intent(
-                                                    Intent.ACTION_VIEW,
-                                                    Uri.parse("https://github.com/$repoName/releases")
-                                                ).apply { flags = Intent.FLAG_ACTIVITY_NEW_TASK }
-                                                try {
-                                                    context.startActivity(intent)
-                                                } catch (e: Exception) {
-                                                    // ignore
-                                                }
-                                            },
-                                            shape = RoundedCornerShape(10.dp),
-                                            modifier = Modifier.weight(1f)
-                                        ) {
-                                            Icon(
-                                                Icons.Default.OpenInBrowser,
-                                                contentDescription = null,
-                                                modifier = Modifier.size(16.dp)
-                                            )
-                                            Spacer(modifier = Modifier.width(4.dp))
-                                            Text("Draft Release", fontSize = 12.sp)
-                                        }
-                                    } else {
-                                        OutlinedButton(
-                                            onClick = {
-                                                showRepoConfig = true
-                                            },
-                                            shape = RoundedCornerShape(10.dp),
-                                            modifier = Modifier.weight(1f)
-                                        ) {
-                                            Icon(
-                                                Icons.Default.Settings,
-                                                contentDescription = null,
-                                                modifier = Modifier.size(16.dp)
-                                            )
-                                            Spacer(modifier = Modifier.width(4.dp))
-                                            Text("Set Repo", fontSize = 12.sp)
-                                        }
-                                    }
-
-                                    Button(
-                                        onClick = {
-                                            AppUpdateManager.simulateMandatoryUpdate(context)
-                                            onDismiss()
-                                            onNotificationSent("🚨 Mandatory Update triggered! Notification sent & screen locked.")
-                                        },
-                                        shape = RoundedCornerShape(10.dp),
-                                        colors = ButtonDefaults.buttonColors(
-                                            containerColor = if (isNoReleasesYet) MaterialTheme.colorScheme.secondary else AlertRed
-                                        ),
-                                        modifier = Modifier.weight(1f)
-                                    ) {
-                                        Icon(
-                                            Icons.Default.NotificationsActive,
-                                            contentDescription = null,
-                                            modifier = Modifier.size(16.dp),
-                                            tint = Color.White
-                                        )
-                                        Spacer(modifier = Modifier.width(4.dp))
-                                        Text("Test Update", fontSize = 12.sp, color = Color.White)
-                                    }
+                                    Icon(
+                                        Icons.Default.OpenInBrowser,
+                                        contentDescription = null,
+                                        modifier = Modifier.size(16.dp)
+                                    )
+                                    Spacer(modifier = Modifier.width(4.dp))
+                                    Text("Open GitHub Releases", fontSize = 12.sp)
                                 }
                             }
                         }
@@ -467,187 +429,17 @@ fun UpdateDialog(
                     )
                     Spacer(modifier = Modifier.width(6.dp))
                     Text(
-                        "Test Mandatory Update (Lock & Alert)",
+                        "Test Update Notification & Lock Screen",
                         fontWeight = FontWeight.Bold,
                         color = Color.White
                     )
                 }
 
-                // GitHub Release Configuration
-                val isPlaceholder = AppUpdateManager.isPlaceholderRepo(repoName)
+                // How to publish updates guide
                 Card(
                     shape = RoundedCornerShape(14.dp),
                     colors = CardDefaults.cardColors(
-                        containerColor = if (isPlaceholder) {
-                            MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.25f)
-                        } else {
-                            MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f)
-                        }
-                    ),
-                    border = if (isPlaceholder) {
-                        BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.4f))
-                    } else null,
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Column(
-                        modifier = Modifier.padding(14.dp),
-                        verticalArrangement = Arrangement.spacedBy(10.dp)
-                    ) {
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .clickable { showRepoConfig = !showRepoConfig },
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Row(
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(8.dp)
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Default.Settings,
-                                    contentDescription = null,
-                                    modifier = Modifier.size(18.dp),
-                                    tint = MaterialTheme.colorScheme.primary
-                                )
-                                Column {
-                                    Text(
-                                        text = "Release Feed Configuration",
-                                        style = MaterialTheme.typography.titleSmall,
-                                        fontWeight = FontWeight.Bold
-                                    )
-                                    if (isPlaceholder) {
-                                        Text(
-                                            text = "Sample placeholder: enter your GitHub repo",
-                                            style = MaterialTheme.typography.labelSmall,
-                                            color = MaterialTheme.colorScheme.primary
-                                        )
-                                    }
-                                }
-                            }
-                            Icon(
-                                imageVector = if (showRepoConfig) Icons.Default.KeyboardArrowUp else Icons.Default.KeyboardArrowDown,
-                                contentDescription = null,
-                                tint = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                        }
-
-                        if (showRepoConfig) {
-                            OutlinedTextField(
-                                value = repoName,
-                                onValueChange = {
-                                    repoName = it
-                                    AppUpdateManager.setGitHubRepo(context, it)
-                                },
-                                label = { Text("GitHub Repo (owner/repository)") },
-                                placeholder = { Text("e.g. kmochy013/Reminder") },
-                                shape = RoundedCornerShape(12.dp),
-                                singleLine = true,
-                                modifier = Modifier.fillMaxWidth()
-                            )
-
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                OutlinedButton(
-                                    onClick = {
-                                        val intent = Intent(
-                                            Intent.ACTION_VIEW,
-                                            Uri.parse("https://github.com/$repoName/releases")
-                                        ).apply { flags = Intent.FLAG_ACTIVITY_NEW_TASK }
-                                        try {
-                                            context.startActivity(intent)
-                                        } catch (e: Exception) {
-                                            // ignore
-                                        }
-                                    },
-                                    shape = RoundedCornerShape(10.dp),
-                                    modifier = Modifier.fillMaxWidth()
-                                ) {
-                                    Icon(
-                                        Icons.Default.OpenInBrowser,
-                                        contentDescription = null,
-                                        modifier = Modifier.size(16.dp)
-                                    )
-                                    Spacer(modifier = Modifier.width(6.dp))
-                                    Text("Open GitHub Releases in Browser", fontSize = 12.sp)
-                                }
-                            }
-
-                            Text(
-                                text = "Configured for 'kmochy013/Reminder'. When you publish a release tag (like v1.1) on GitHub, all phones receive an auto-update alert.",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-
-                            // Quick Guide Expandable
-                            Row(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .clickable { showGuide = !showGuide },
-                                horizontalArrangement = Arrangement.spacedBy(6.dp),
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Default.Info,
-                                    contentDescription = null,
-                                    modifier = Modifier.size(14.dp),
-                                    tint = MaterialTheme.colorScheme.primary
-                                )
-                                Text(
-                                    text = if (showGuide) "Hide release setup guide" else "How to create a release on GitHub?",
-                                    style = MaterialTheme.typography.labelMedium,
-                                    fontWeight = FontWeight.SemiBold,
-                                    color = MaterialTheme.colorScheme.primary
-                                )
-                            }
-
-                            if (showGuide) {
-                                Column(
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .background(
-                                            MaterialTheme.colorScheme.surface,
-                                            RoundedCornerShape(8.dp)
-                                        )
-                                        .padding(10.dp),
-                                    verticalArrangement = Arrangement.spacedBy(4.dp)
-                                ) {
-                                    Text(
-                                        text = "1. Go to github.com/kmochy013/Reminder.",
-                                        style = MaterialTheme.typography.bodySmall
-                                    )
-                                    Text(
-                                        text = "2. On the right side, click 'Releases' → 'Draft a new release'.",
-                                        style = MaterialTheme.typography.bodySmall
-                                    )
-                                    Text(
-                                        text = "3. Choose a tag: v1.1 (or v1.2) and Release title: Version 1.1.",
-                                        style = MaterialTheme.typography.bodySmall
-                                    )
-                                    Text(
-                                        text = "4. Attach your new APK file under 'Attach binaries' and click 'Publish release'.",
-                                        style = MaterialTheme.typography.bodySmall
-                                    )
-                                    Text(
-                                        text = "5. Done! All installed phones will immediately detect v1.1 and pop up the mandatory update!",
-                                        style = MaterialTheme.typography.bodySmall,
-                                        fontWeight = FontWeight.SemiBold,
-                                        color = MaterialTheme.colorScheme.primary
-                                    )
-                                }
-                            }
-                        }
-                    }
-                }
-
-                // Troubleshooting: Why didn't I receive an update message?
-                Card(
-                    shape = RoundedCornerShape(14.dp),
-                    colors = CardDefaults.cardColors(
-                        containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f)
+                        containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f)
                     ),
                     modifier = Modifier.fillMaxWidth()
                 ) {
@@ -659,7 +451,7 @@ fun UpdateDialog(
                         Row(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .clickable { showTroubleshooting = !showTroubleshooting },
+                                .clickable { showGuide = !showGuide },
                             horizontalArrangement = Arrangement.SpaceBetween,
                             verticalAlignment = Alignment.CenterVertically
                         ) {
@@ -674,36 +466,33 @@ fun UpdateDialog(
                                     modifier = Modifier.size(18.dp)
                                 )
                                 Text(
-                                    text = "Why didn't my mobile phone alert me?",
+                                    text = "How do auto-updates work?",
                                     style = MaterialTheme.typography.labelLarge,
                                     fontWeight = FontWeight.SemiBold
                                 )
                             }
                             Icon(
-                                imageVector = if (showTroubleshooting) Icons.Default.KeyboardArrowUp else Icons.Default.KeyboardArrowDown,
+                                imageVector = if (showGuide) Icons.Default.KeyboardArrowUp else Icons.Default.KeyboardArrowDown,
                                 contentDescription = null,
                                 tint = MaterialTheme.colorScheme.onSurfaceVariant
                             )
                         }
 
-                        if (showTroubleshooting) {
-                            Spacer(modifier = Modifier.height(10.dp))
-                            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        if (showGuide) {
+                            Spacer(modifier = Modifier.height(8.dp))
+                            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
                                 Text(
-                                    text = "1. 'No releases found on GitHub repo':\n" +
-                                            "Your repository 'kmochy013/Reminder' is connected and public! However, no Releases have been published on GitHub yet. Tap 'Draft Release' to publish a release tag (like v1.1) with your APK.",
+                                    text = "1. Everything is built-in: The app is directly wired to your GitHub repository.",
                                     style = MaterialTheme.typography.bodySmall,
                                     color = MaterialTheme.colorScheme.onSurface
                                 )
                                 Text(
-                                    text = "2. You already installed this update:\n" +
-                                            "Your mobile is currently on v${AppUpdateManager.CURRENT_VERSION_NAME} (Build ${AppUpdateManager.CURRENT_VERSION_CODE}). The system only notifies devices running older versions.",
+                                    text = "2. When you want to release an update, publish a release tag (e.g. 'v1.1') with your APK at github.com/${AppUpdateManager.DEFAULT_GITHUB_REPO}/releases.",
                                     style = MaterialTheme.typography.bodySmall,
                                     color = MaterialTheme.colorScheme.onSurface
                                 )
                                 Text(
-                                    text = "3. Test right now without GitHub:\n" +
-                                            "Tap 'Test Mandatory Update (Lock & Alert)' above to immediately trigger the update notification and the mandatory update lock screen on your device.",
+                                    text = "3. Installed devices automatically check in the background. As soon as a newer version is seen, a high-priority update notification is shown and the mandatory update screen prompts the user to download the update.",
                                     style = MaterialTheme.typography.bodySmall,
                                     color = MaterialTheme.colorScheme.onSurface
                                 )
@@ -774,3 +563,4 @@ private fun UpdateAvailableCard(
         }
     }
 }
+
